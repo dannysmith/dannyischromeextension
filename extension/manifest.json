@@ -2,23 +2,27 @@
   "manifest_version": 3,
   "name": "Danny Is...",
   "description": "Create notes for danny.is.",
-  "version": "1.0",
+  "version": "1.1",
   "permissions": [
-    "activeTab",
+    "sidePanel",
     "scripting",
     "nativeMessaging",
-    "storage"
+    "storage",
+    "tabs"
+  ],
+  "side_panel": {
+    "default_path": "sidebar.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content_script.js"]
+    }
   ],
   "action": {
     "default_title": "Create Note"
   },
   "background": {
     "service_worker": "background.js"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": ["sidebar.html", "sidebar.css", "easymde.min.css", "easymde.min.js"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  }
 }

@@ -2,17 +2,17 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <link rel="stylesheet" href="chrome-extension://__MSG_@@extension_id__/sidebar.css">
-  <link rel="stylesheet" href="chrome-extension://__MSG_@@extension_id__/easymde.min.css">
+  <link rel="stylesheet" href="sidebar.css">
+  <link rel="stylesheet" href="easymde.min.css">
 </head>
 <body>
   <div id="dannyis-sidebar">
     <div class="header">
       <h3>Create Note</h3>
-      <button id="close-sidebar-btn">&times;</button>
+      <!-- The close button is no longer needed as the side panel is controlled by the browser -->
     </div>
     <div class="content">
-      <p><strong>Title:</strong> <span id="page-title"></span></p>
+      <p><strong>Title:</strong> <span id="page-title">Loading...</span></p>
       <textarea id="markdown-editor"></textarea>
       <div class="button-group">
         <button id="add-highlight-btn">Add Highlight</button>
@@ -20,6 +20,7 @@
       </div>
     </div>
   </div>
-  <script src="chrome-extension://__MSG_@@extension_id__/easymde.min.js"></script>
+  <script src="easymde.min.js"></script>
+  <script src="sidebar.js"></script>
 </body>
 </html>
