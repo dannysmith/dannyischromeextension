@@ -1,75 +1,91 @@
-#!/usr/bin/env node
+const fs = require('fs')
+const path = require('path')
+const os = require('os')
 
-const fs = require('fs');
-const path = require('path');
-
-// Hardcoded path to the Astro project's notes directory
-const notesDir = '/Users/danny/dev/dannyis-astro/src/content/notes';
-
-// Function to slugify text for filenames
-function slugify(text) {
-  return text
-    .toString()
-    .toLowerCase()
-    .replace(/\s+/g, '-')     // Replace spaces with -
-    .replace(/[^\w\-]+/g, '') // Remove all non-word chars
-    .replace(/\-\-+/g, '-')   // Replace multiple - with single -
-    .replace(/^-+/, '')       // Trim - from start of text
-    .replace(/-+$/, '');      // Trim - from end of text
+// --- Debug Logging ---
+const logPath = path.join(os.tmpdir(), 'dannyis_native_host.log')
+const log = (message) => {
+  fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${message}\n`)
 }
 
-// Function to read messages from Chrome
-function readMessage(callback) {
-  const chunks = [];
-  process.stdin.on('data', chunk => chunks.push(chunk));
-  process.stdin.on('end', () => {
-    const input = Buffer.concat(chunks);
-    const messageLength = input.readUInt32LE(0);
-    const messageContent = input.slice(4, 4 + messageLength).toString();
-    callback(JSON.parse(messageContent));
-  });
-}
+log('--- Native host script started ---')
 
-// Main logic
-readMessage((data) => {
-  try {
-    const { title, sourceUrl, markdownContent } = data;
+try {
+  // Hardcoded path to the Astro project's notes directory
+  const notesDir = '/Users/danny/dev/dannyis-astro/src/content/notes'
+  log(`Notes directory: ${notesDir}`)
 
-    // 1. Generate filename
-    const timestamp = new Date().getTime();
-    const slug = slugify(title);
-    const filename = `${timestamp}-${slug}.md`;
-    const filePath = path.join(notesDir, filename);
+  // Function to slugify text for filenames
+  function slugify(text) {
+    return text
+      .toString()
+      .toLowerCase()
+      .replace(/\s+/g, '-') // Replace spaces with -
+      .replace(/[^\w\-]+/g, '') // Remove all non-word chars
+      .replace(/\-\-+/g, '-') // Replace multiple - with single -
+      .replace(/^-+/, '') // Trim - from start of text
+      .replace(/-+$/, '') // Trim - from end of text
+  }
 
-    // 2. Construct file content with frontmatter
-    const fileContent = `---
-title: "${title.replace(/"/g, '\"')}"
+  // Function to send a message back to the extension
+  function sendMessage(message) {
+    const buffer = Buffer.from(JSON.stringify(message))
+    const lengthBuffer = Buffer.alloc(4)
+    lengthBuffer.writeUInt32LE(buffer.length, 0)
+    process.stdout.write(lengthBuffer)
+    process.stdout.write(buffer)
+  }
+
+  // Function to read messages from Chrome
+  process.stdin.on('data', (chunk) => {
+    log('Received data chunk from Chrome.')
+    // This implementation is simplified to handle one message per execution,
+    // which is a common pattern for native messaging hosts.
+    // A more robust solution would handle buffer splitting if multiple messages arrived at once.
+    try {
+      const messageLength = chunk.readUInt32LE(0)
+      const messageContent = chunk.slice(4, 4 + messageLength).toString()
+      const data = JSON.parse(messageContent)
+      log('Successfully parsed message: ' + JSON.stringify(data, null, 2))
+
+      const { title, sourceUrl, markdownContent } = data
+
+      // 1. Generate filename
+      const timestamp = new Date().getTime()
+      const slug = slugify(title)
+      const filename = `${timestamp}-${slug}.md`
+      const filePath = path.join(notesDir, filename)
+      log(`Generated file path: ${filePath}`)
+
+      // 2. Construct file content with frontmatter
+      const fileContent = `---
+title: "${title.replace(/"/g, '"')}"
 sourceUrl: "${sourceUrl}"
 tags: []
-published: false
-publishedOn: ""
+draft: true
+pubDate: ${new Date().toISOString()}
 ---
 
-${markdownContent}
-`;
+${markdownContent || ''}
+`
+      log('Constructed file content.')
 
-    // 3. Write the file
-    fs.writeFileSync(filePath, fileContent);
+      // 3. Write the file
+      fs.writeFileSync(filePath, fileContent)
+      log('Successfully wrote file.')
 
-    // Send a success response back to the extension
-    const response = { status: 'success', filePath: filePath };
-    const responseBuffer = Buffer.from(JSON.stringify(response));
-    const lengthBuffer = Buffer.alloc(4);
-    lengthBuffer.writeUInt32LE(responseBuffer.length, 0);
-    process.stdout.write(lengthBuffer);
-    process.stdout.write(responseBuffer);
+      sendMessage({ status: 'success', filePath: filePath })
+      log('Sent success response.')
+    } catch (err) {
+      log('Error processing message: ' + err.stack)
+      sendMessage({ status: 'error', message: err.message, stack: err.stack })
+    }
+  })
 
-  } catch (err) {
-    const response = { status: 'error', message: err.message };
-    const responseBuffer = Buffer.from(JSON.stringify(response));
-    const lengthBuffer = Buffer.alloc(4);
-    lengthBuffer.writeUInt32LE(responseBuffer.length, 0);
-    process.stdout.write(lengthBuffer);
-    process.stdout.write(responseBuffer);
-  }
-});
+  process.stdin.on('end', () => {
+    log('--- Stdin closed, native host exiting ---')
+  })
+} catch (err) {
+  log('!!! A critical error occurred on startup: ' + err.stack)
+  // If we crash on startup, we can't send a message back, but the log will tell us why.
+}

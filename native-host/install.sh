@@ -4,7 +4,11 @@ set -e
 
 # Get the directory where the script is located
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-HOST_SCRIPT_PATH="$DIR/native-host.js"
+
+# --- IMPORTANT ---
+# The path in the manifest must point to our new launcher script.
+HOST_SCRIPT_PATH="$DIR/native-host-launcher.sh"
+# ---
 
 # The name of the manifest file
 MANIFEST_NAME="com.dannyis.native_host.json"
@@ -42,13 +46,13 @@ install_manifest "$TARGET_DIR_CHROMIUM"
 # Clean up the temporary file
 rm "$TEMP_MANIFEST"
 
-# Make the host script executable
-chmod +x "$HOST_SCRIPT_PATH"
+# --- IMPORTANT ---
+# Make both the launcher and the node script executable.
+chmod +x "$DIR/native-host.js"
+chmod +x "$DIR/native-host-launcher.sh"
+# ---
 
 echo ""
 echo "Installation complete."
-echo "IMPORTANT: You must now load the extension in Chrome (or Chromium) and update the 'allowed_origins' in the manifest file with the extension's ID."
-echo "The manifest file is located at:"
-echo "Chrome: $TARGET_DIR_CHROME/$MANIFEST_NAME"
-echo "Chromium: $TARGET_DIR_CHROMIUM/$MANIFEST_NAME"
-echo "After updating the ID, the setup will be complete."
+echo "The native host is now pointing to the launcher script."
+echo "If you previously set the 'allowed_origins' ID, you should not need to change it again."
