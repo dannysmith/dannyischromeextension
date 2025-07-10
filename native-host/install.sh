@@ -12,8 +12,11 @@ HOST_SCRIPT_PATH="$DIR/native-host-launcher.sh"
 
 # The name of the manifest file
 MANIFEST_NAME="com.dannyis.native_host.json"
+
+# Define target directories for supported browsers
 TARGET_DIR_CHROME="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
 TARGET_DIR_CHROMIUM="$HOME/Library/Application Support/Chromium/NativeMessagingHosts"
+TARGET_DIR_ARC="$HOME/Library/Application Support/Arc/User Data/NativeMessagingHosts"
 
 # The manifest file in the current directory
 SOURCE_MANIFEST="$DIR/$MANIFEST_NAME"
@@ -28,20 +31,22 @@ sed "s|NATIVE_HOST_PATH|$HOST_SCRIPT_PATH|g" "$SOURCE_MANIFEST" > "$TEMP_MANIFES
 # Function to install the manifest
 install_manifest() {
   TARGET_DIR=$1
+  BROWSER_NAME=$2
   if [ -d "$TARGET_DIR" ]; then
-    echo "Installing manifest for $TARGET_DIR"
+    echo "Found $BROWSER_NAME. Installing manifest..."
     mkdir -p "$TARGET_DIR"
     cp "$TEMP_MANIFEST" "$TARGET_DIR/$MANIFEST_NAME"
     chmod 644 "$TARGET_DIR/$MANIFEST_NAME"
-    echo "Manifest installed at $TARGET_DIR/$MANIFEST_NAME"
+    echo "-> Manifest installed at $TARGET_DIR/$MANIFEST_NAME"
   else
-    echo "Directory not found: $TARGET_DIR. Skipping."
+    echo "-> $BROWSER_NAME not found. Skipping."
   fi
 }
 
-# Install for both Chrome and Chromium if they exist
-install_manifest "$TARGET_DIR_CHROME"
-install_manifest "$TARGET_DIR_CHROMIUM"
+# Install for all supported browsers if their directories exist
+install_manifest "$TARGET_DIR_CHROME" "Google Chrome"
+install_manifest "$TARGET_DIR_CHROMIUM" "Chromium"
+install_manifest "$TARGET_DIR_ARC" "Arc Browser"
 
 # Clean up the temporary file
 rm "$TEMP_MANIFEST"
