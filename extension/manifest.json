@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Danny Is...",
+  "description": "Create notes for danny.is.",
+  "version": "1.0",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "nativeMessaging",
+    "storage"
+  ],
+  "action": {
+    "default_title": "Create Note"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["sidebar.html", "sidebar.css", "easymde.min.css", "easymde.min.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

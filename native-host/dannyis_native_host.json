@@ -1,0 +1,9 @@
+{
+  "name": "com.dannyis.native_host",
+  "description": "Native host for Danny Is... Chrome Extension",
+  "path": "NATIVE_HOST_PATH",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://fphcdaenpdcbigjgelomfjdflnceokpe/"
+  ]
+}
