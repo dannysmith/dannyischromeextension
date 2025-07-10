@@ -1,81 +1,75 @@
-# Scratchpad and Planning doc
+# Danny is Chrome Extension - Development Plan
 
-## Initial Non-Technical Research from Claude - Chrome Extension Architecture Guide for Markdown Note-Taking
+This document outlines the plan for building the Chrome extension to streamline creating notes for the user's Astro-based personal website.
 
-Building a Chrome extension that captures web content as markdown notes requires careful consideration of multiple technical approaches. Based on comprehensive research of existing solutions, Chrome extension architecture, and security requirements, here's a detailed analysis with practical recommendations for the simplest implementation path.
+## 1. Overview
 
-### Chrome extension architecture with sidebar markdown editor
+The primary technical challenge is that Chrome extensions cannot directly write files to the user's local filesystem for security reasons. To solve this, we will use Chrome's **Native Messaging** feature.
 
-**Chrome Side Panel API is the optimal choice** for implementing a persistent markdown editor. Available since Chrome 114, this API provides a native sidebar experience that users control and expect.
+This approach splits the project into two main components:
+1.  **The Chrome Extension:** This is the user-facing part. It will handle the UI (sidebar), capture page information, and collect the user's notes.
+2.  **A Native Host Application:** This is a small, separate application (a Node.js script in our case) that the Chrome extension communicates with. Its *only* job is to receive the note data from the extension and write it to the correct file on the local disk.
 
-The **recommended architecture pattern** uses three main components working together:
+This architecture is secure, robust, and allows us to meet all requirements with minimal complexity.
 
-The **side panel** handles the markdown editing interface with full Chrome API access. It can persist across tabs and provides a clean workspace for note composition. The **content script** manages page interaction, capturing metadata and handling text selection. It runs in the webpage context with direct DOM access but limited API permissions. The **service worker** orchestrates data flow between components and handles file operations, replacing the old background pages with an event-driven model.
+## 2. Core Components
 
-**Key implementation benefits** include user-controlled positioning, persistent UI state, and familiar Chrome interface patterns. The side panel automatically handles resizing and positioning, eliminating complex iframe injection approaches used by older extensions.
+### A. The Chrome Extension (Frontend)
 
-The manifest configuration requires `"side_panel"` permission and a dedicated HTML file. Service workers handle tab updates and enable the panel contextually. This approach provides better user experience than popup-based solutions while maintaining security boundaries.
+This is the part that runs inside Chrome. It will be built with standard HTML, CSS, and JavaScript.
 
-### File saving methods comparison reveals clear trade-offs
+*   **`manifest.json`**: The core configuration file for the extension. It will define:
+    *   Permissions needed: `nativeMessaging` to talk to our host application, `activeTab` to get the current page's URL and title, and `scripting` to inject our code.
+    *   The background service worker (`background.js`).
+    *   The action to take when the user clicks the extension icon in the toolbar.
 
-**Chrome Downloads API emerges as the recommended approach** for most use cases, offering the best balance of simplicity and functionality. With just a "downloads" permission, it enables single-method file saving with minimal code complexity.
+*   **Background Script (`background.js`)**: An invisible script that runs in the background.
+    *   It will listen for the toolbar icon click.
+    *   When clicked, it will inject the `content_script.js` into the current page.
+    *   It will act as the central communication hub, relaying messages from the content script to the native host application.
 
-**Implementation advantages** include saving to Downloads folder subdirectories, automatic conflict resolution, and built-in download management. The API handles edge cases like disk space and permissions automatically. Files integrate with browser download history, providing users familiar management options.
+*   **Content Script (`content_script.js`)**: A script injected directly into the web page the user is viewing.
+    *   It will be responsible for creating and managing the sidebar UI (injecting HTML and CSS).
+    *   It will automatically grab the page's `title` and `URL`.
+    *   It will contain the logic for the "Add Highlight" button, which will get the selected text from the page.
+    *   It will send the final note data (title, URL, markdown content) to the `background.js` script when the user clicks "Save".
 
-**Limitations are manageable** for most users. Files save exclusively to the Downloads folder structure, which aligns with user expectations for saved web content. Download notifications appear briefly but don't significantly impact user experience.
+*   **Sidebar UI (`sidebar.html`, `sidebar.css`)**: Simple HTML and CSS to create the sidebar.
+    *   A `textarea` will serve as the markdown editor.
+    *   Buttons for "Add Highlight" and "Save".
+    *   An area to display the captured page title.
 
-**File System Access API offers advanced capabilities** for applications requiring specific directory control. Users choose save locations via file picker, enabling integration with existing note-taking workflows. However, this approach requires user interaction for each save operation and works only in Chromium-based browsers.
+### B. The Native Host Application (Backend)
 
-**Native Messaging provides maximum control** but introduces substantial complexity. It requires separate native application development, platform-specific deployment, and ongoing maintenance of multiple components. This approach suits enterprise applications but exceeds the "minimal maintenance burden" requirement.
+This is a simple Node.js script that runs locally on the user's machine. It is the bridge between the browser and the local filesystem.
 
-### Existing solutions provide proven technical patterns
+*   **Native Host Manifest (`dannyis_native_host.json`)**: A JSON file that tells Chrome where to find our native application script and that our extension is allowed to talk to it. This file needs to be placed in a specific directory on the system so Chrome can find it.
 
-**MarkDownload represents the gold standard** for web-to-markdown conversion. With 4.7/5 stars and widespread adoption, it demonstrates the most successful technical approach: Mozilla's Readability.js for content extraction followed by Turndown for HTML-to-markdown conversion.
+*   **Node.js Script (`native-host.js`)**: The core of the backend.
+    *   It will be a simple script that reads messages from standard input (`stdin`). Chrome sends native messages this way.
+    *   When it receives a message containing the note data, it will perform the file-writing logic.
+    *   It can reuse or adapt the logic from the user's existing `scripts/create-note.ts` to format the frontmatter and content correctly.
+    *   It will construct the final file path (e.g., `/Users/danny/dev/dannyis-astro/src/content/notes/TIMESTAMP-title.md`) and write the file. The path to the Astro project will be hardcoded in this script.
 
-**Web Highlights shows optimal highlighting implementation** with 4.8/5 stars from 3.6K users. It uses local storage for persistence with optional cloud sync, multi-color highlighting, and export capabilities. The extension demonstrates that sophisticated highlighting can work reliably without account requirements.
+## 3. Workflow (How it all connects)
 
-**Obsidian Web Clipper introduces template-based extraction** for structured data capture. Rather than generic article parsing, it uses selectors and templates for specific sites, providing cleaner, more predictable results.
+1.  **User Action:** The user clicks the extension icon on a page they want to write a note about.
+2.  **UI Injection:** The `background.js` script injects `content_script.js` into the page.
+3.  **Sidebar Appears:** The `content_script.js` creates the sidebar UI, pre-filling the page title and URL.
+4.  **User Writes Note:** The user types in the markdown editor and uses the "Add Highlight" button to quote text from the page.
+5.  **Save Action:** The user clicks "Save".
+6.  **Message Passing (Part 1):** The `content_script.js` packages the title, URL, and markdown content into a JSON message and sends it to `background.js`.
+7.  **Message Passing (Part 2):** `background.js` receives the message and sends it to the native host application using the `chrome.runtime.sendNativeMessage` API.
+8.  **File Creation:** The `native-host.js` script, which is listening for messages, receives the data. It formats the final markdown file with frontmatter and saves it to the local Astro project directory.
 
-**Technical stack consensus** emerges from successful extensions: Readability.js v0.5.0 for content extraction, Turndown v7.1.3 for HTML conversion, and CodeMirror-based editors for markdown editing. This combination handles the widest range of websites with consistent results.
+## 4. Setup and Installation
 
-### CodeMirror 6 dominates markdown editor selection
+To make this work, a one-time setup will be required:
 
-**CodeMirror 6 provides the optimal balance** of features, performance, and Chrome extension compatibility. At 124KB minified, it offers modern ES6 architecture with dynamic imports, excellent mobile performance, and full CSP compliance.
+1.  **Install the Chrome Extension:** Load the extension into Chrome in developer mode.
+2.  **Install the Native Host:**
+    *   Place the `native-host.js` script somewhere on the machine.
+    *   Place the `dannyis_native_host.json` manifest file in the correct location for Chrome to detect it (this location varies by OS).
+    *   Run an installation script (a simple `.sh` or `.js` file) that sets the correct path to the `native-host.js` inside the manifest file.
 
-**Key advantages** include modular loading for bundle optimization, extensive customization options, and strong community support. The editor supports both source editing and live preview modes, with 30+ built-in themes and comprehensive keyboard shortcut support.
-
-**EasyMDE serves as a simpler alternative** for rapid development scenarios. Built on CodeMirror 5, it provides WYSIWYG-style editing with minimal setup. However, the older foundation and larger bundle size (200KB including dependencies) make it less optimal for extension development.
-
-**Monaco Editor fails extension requirements** despite powering VS Code. The 2.4MB-5MB bundle size and complex webpack configuration create significant overhead. CSP compliance challenges and setup complexity make it unsuitable for Chrome extensions.
-
-### Security implementation focuses on minimal permissions
-
-**ActiveTab permission provides the secure foundation** for content capture. It grants temporary access only when users invoke the extension, automatically revoking access on navigation. This approach minimizes security warnings while providing necessary functionality.
-
-**Required permissions remain minimal**: `activeTab` for content access, `storage` for data persistence, `downloads` for file saving, and `scripting` for content script injection. This combination avoids broad host permissions that trigger security warnings.
-
-**Content Security Policy compliance** requires bundling all dependencies and avoiding eval() or remote code execution. Modern editors like CodeMirror 6 handle these requirements cleanly, while older solutions may require modifications.
-
-**Data handling best practices** include sanitizing captured content, respecting incognito mode, and implementing proper filename validation. The Downloads API provides secure file operations without exposing filesystem details.
-
-### Simplest implementation path with Astro compatibility
-
-**Recommended architecture** combines proven components with minimal complexity:
-
-**Use Chrome Side Panel API** for the markdown editor interface. This provides native sidebar behavior with excellent user experience. **Implement CodeMirror 6** for markdown editing with syntax highlighting and live preview. **Deploy Readability.js + Turndown** for reliable content extraction and conversion. **Use Chrome Downloads API** for file saving with automatic conflict resolution.
-
-**File format compatibility** with Astro static sites requires markdown files with frontmatter metadata. The extension should generate files with YAML frontmatter containing captured metadata (URL, title, date, tags) followed by markdown content.
-
-**Highlighting integration** uses local storage for persistence and CSS-based text highlighting. Selected text transforms into markdown blockquotes automatically, with visual feedback during selection.
-
-**Development workflow** starts with side panel setup, adds basic markdown editing, implements content capture, and finally adds file saving. This progression allows testing each component independently before integration.
-
-### Conclusion
-
-The path of least complexity combines Chrome Side Panel API for UI, CodeMirror 6 for editing, proven content extraction libraries, and Chrome Downloads API for file operations. This approach leverages mature, well-tested components while maintaining security and user experience standards.
-
-**Total development complexity** remains manageable with this stack, requiring approximately 2,000-3,000 lines of code across all components. The architecture scales well for future enhancements while maintaining the minimal maintenance burden requirement.
-
-**Implementation timeline** estimates 2-3 weeks for a competent developer, with most time spent on UI polish and edge case handling rather than core functionality. The recommended libraries handle complex scenarios automatically, focusing development effort on user experience and integration details.
-
-## Further Notes and Planning
+This plan provides a clear path forward for building the extension simply and robustly, directly addressing the primary technical constraint.
