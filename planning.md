@@ -16,10 +16,10 @@ This architecture is secure, robust, and allows us to meet all requirements with
 
 ### A. The Chrome Extension (Frontend)
 
-This is the part that runs inside Chrome. It will be built with standard HTML, CSS, and JavaScript.
+This is the part that runs inside Chrome. It will be built with standard HTML, CSS, and JavaScript, with a lightweight library for the Markdown editor.
 
 *   **`manifest.json`**: The core configuration file for the extension. It will define:
-    *   Permissions needed: `nativeMessaging` to talk to our host application, `activeTab` to get the current page's URL and title, and `scripting` to inject our code.
+    *   Permissions needed: `nativeMessaging` to talk to our host application, `activeTab` to get the current page's URL and title, `scripting` to inject our code, and `storage` to save note drafts.
     *   The background service worker (`background.js`).
     *   The action to take when the user clicks the extension icon in the toolbar.
 
@@ -29,13 +29,14 @@ This is the part that runs inside Chrome. It will be built with standard HTML, C
     *   It will act as the central communication hub, relaying messages from the content script to the native host application.
 
 *   **Content Script (`content_script.js`)**: A script injected directly into the web page the user is viewing.
-    *   It will be responsible for creating and managing the sidebar UI (injecting HTML and CSS).
+    *   It will be responsible for creating and managing the sidebar UI.
     *   It will automatically grab the page's `title` and `URL`.
-    *   It will contain the logic for the "Add Highlight" button, which will get the selected text from the page.
-    *   It will send the final note data (title, URL, markdown content) to the `background.js` script when the user clicks "Save".
+    *   **State Persistence:** On opening, it will check `chrome.storage.local` for any saved draft content corresponding to the current page's URL. If found, it will restore the content into the editor. As the user types, it will automatically save the draft to `chrome.storage.local`, preventing data loss.
+    *   It will contain the logic for the "Add Highlight" button.
+    *   When the user clicks "Save", it will send the final note data to `background.js` and clear the saved draft from `chrome.storage.local`.
 
-*   **Sidebar UI (`sidebar.html`, `sidebar.css`)**: Simple HTML and CSS to create the sidebar.
-    *   A `textarea` will serve as the markdown editor.
+*   **Sidebar UI (`sidebar.html`, `sidebar.css`)**: The HTML and CSS for the sidebar.
+    *   We will use a lightweight, simple library like **EasyMDE** to provide a `textarea` with basic Markdown syntax highlighting and a clean writing interface.
     *   Buttons for "Add Highlight" and "Save".
     *   An area to display the captured page title.
 
@@ -46,21 +47,32 @@ This is a simple Node.js script that runs locally on the user's machine. It is t
 *   **Native Host Manifest (`dannyis_native_host.json`)**: A JSON file that tells Chrome where to find our native application script and that our extension is allowed to talk to it. This file needs to be placed in a specific directory on the system so Chrome can find it.
 
 *   **Node.js Script (`native-host.js`)**: The core of the backend.
-    *   It will be a simple script that reads messages from standard input (`stdin`). Chrome sends native messages this way.
-    *   When it receives a message containing the note data, it will perform the file-writing logic.
-    *   It can reuse or adapt the logic from the user's existing `scripts/create-note.ts` to format the frontmatter and content correctly.
-    *   It will construct the final file path (e.g., `/Users/danny/dev/dannyis-astro/src/content/notes/TIMESTAMP-title.md`) and write the file. The path to the Astro project will be hardcoded in this script.
+    *   It will be a simple script that reads messages from standard input (`stdin`).
+    *   When it receives the note data (title, sourceUrl, markdownContent), it will generate the final file.
+    *   **File Naming:** The script will create a filename by combining the current Unix timestamp (in milliseconds) with a slugified version of the title, e.g., `1700733150901-apples-thunderbolt-3-cables.md`.
+    *   **File Content:** It will construct the file content with YAML frontmatter, replicating the format from the user's existing notes. The `published` flag will be hardcoded to `false`.
+        ```yaml
+        ---
+        title: "The Page Title from the Browser"
+        sourceUrl: "https://the.url/of-the-page"
+        tags: []
+        published: false
+        publishedOn: ""
+        ---
+
+        The markdown content from the editor goes here.
+        ```
+    *   It will save the file to the hardcoded path of the user's Astro project: `/Users/danny/dev/dannyis-astro/src/content/notes/`.
 
 ## 3. Workflow (How it all connects)
 
-1.  **User Action:** The user clicks the extension icon on a page they want to write a note about.
-2.  **UI Injection:** The `background.js` script injects `content_script.js` into the page.
-3.  **Sidebar Appears:** The `content_script.js` creates the sidebar UI, pre-filling the page title and URL.
-4.  **User Writes Note:** The user types in the markdown editor and uses the "Add Highlight" button to quote text from the page.
-5.  **Save Action:** The user clicks "Save".
-6.  **Message Passing (Part 1):** The `content_script.js` packages the title, URL, and markdown content into a JSON message and sends it to `background.js`.
-7.  **Message Passing (Part 2):** `background.js` receives the message and sends it to the native host application using the `chrome.runtime.sendNativeMessage` API.
-8.  **File Creation:** The `native-host.js` script, which is listening for messages, receives the data. It formats the final markdown file with frontmatter and saves it to the local Astro project directory.
+1.  **User Action:** The user clicks the extension icon.
+2.  **UI Injection & State Restoration:** The `background.js` script injects `content_script.js`. The content script creates the sidebar UI and loads any saved draft for that URL from `chrome.storage.local` into the EasyMDE editor.
+3.  **User Writes Note:** The user types in the editor. Changes are auto-saved to local storage. The user can add blockquotes using the "Add Highlight" button.
+4.  **Save Action:** The user clicks "Save".
+5.  **Message Passing (Part 1):** The `content_script.js` packages the final data into a JSON message and sends it to `background.js`. It then clears the draft from `chrome.storage.local`.
+6.  **Message Passing (Part 2):** `background.js` relays the message to the native host application.
+7.  **File Creation:** The `native-host.js` script receives the data, generates the correctly formatted filename and frontmatter, and saves the new note file to the local Astro project directory.
 
 ## 4. Setup and Installation
 
