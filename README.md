@@ -98,4 +98,4 @@ This extension is designed for personal use with minimal maintenance overhead. T
 
 ## Security
 
-The extension uses Chrome's native messaging API for secure communication between the browser and local filesystem. Only the registered extension can communicate with the native host, and the native host only writes to a specific directory.
+The extension uses Chrome's native messaging API for secure communication between the browser and local filesystem. Only the registered extension can communicate with the native host and the native host only writes to a specific directory.
