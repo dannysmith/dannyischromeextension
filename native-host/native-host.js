@@ -60,7 +60,7 @@ try {
       // 2. Construct file content with frontmatter
       const fileContent = `---
 title: "${title.replace(/"/g, '"')}"
-sourceUrl: "${sourceUrl}"
+sourceURL: "${sourceUrl}"
 tags: []
 draft: true
 pubDate: ${new Date().toISOString()}
