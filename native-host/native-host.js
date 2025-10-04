@@ -15,16 +15,37 @@ try {
   const notesDir = '/Users/danny/dev/dannyis-astro/src/content/notes'
   log(`Notes directory: ${notesDir}`)
 
-  // Function to slugify text for filenames
+  // Function to slugify text for filenames (limited to 5 words)
   function slugify(text) {
-    return text
+    const words = text
       .toString()
       .toLowerCase()
-      .replace(/\s+/g, '-') // Replace spaces with -
-      .replace(/[^\w\-]+/g, '') // Remove all non-word chars
+      .replace(/[^\w\s-]/g, '') // Remove non-word chars except spaces and hyphens
+      .trim()
+      .split(/\s+/) // Split on whitespace
+      .slice(0, 5) // Limit to 5 words
+
+    return words
+      .join('-')
       .replace(/\-\-+/g, '-') // Replace multiple - with single -
-      .replace(/^-+/, '') // Trim - from start of text
-      .replace(/-+$/, '') // Trim - from end of text
+      .replace(/^-+/, '') // Trim - from start
+      .replace(/-+$/, '') // Trim - from end
+  }
+
+  // Function to generate unique filename with duplicate handling
+  function generateUniqueFilename(baseFilename, directory) {
+    const ext = path.extname(baseFilename)
+    const nameWithoutExt = baseFilename.slice(0, -ext.length)
+
+    let filename = baseFilename
+    let counter = 1
+
+    while (fs.existsSync(path.join(directory, filename))) {
+      filename = `${nameWithoutExt}-${counter}${ext}`
+      counter++
+    }
+
+    return filename
   }
 
   // Function to send a message back to the extension
@@ -50,10 +71,12 @@ try {
 
       const { title, sourceUrl, markdownContent } = data
 
-      // 1. Generate filename
-      const timestamp = new Date().getTime()
+      // 1. Generate filename with ISO date
+      const now = new Date()
+      const isoDate = now.toISOString().split('T')[0] // YYYY-MM-DD
       const slug = slugify(title)
-      const filename = `${timestamp}-${slug}.md`
+      const baseFilename = `${isoDate}-${slug}.md`
+      const filename = generateUniqueFilename(baseFilename, notesDir)
       const filePath = path.join(notesDir, filename)
       log(`Generated file path: ${filePath}`)
 
