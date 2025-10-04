@@ -48,12 +48,40 @@ document.addEventListener('DOMContentLoaded', () => {
   addHighlightBtn.addEventListener('click', () => {
     chrome.runtime.sendMessage({ action: 'getSelection' }, (response) => {
       if (response && response.selection) {
-        const currentContent = easyMDE.value();
+        const cm = easyMDE.codemirror;
+        const doc = cm.getDoc();
+        const cursor = doc.getCursor();
+
         const blockquote = `> ${response.selection.replace(/\n/g, '\n> ')}\n\n`;
-        easyMDE.value(currentContent + blockquote);
-        easyMDE.codemirror.focus();
+        doc.replaceRange(blockquote, cursor);
+
+        // Move cursor to end of inserted content and focus
+        const lines = blockquote.split('\n');
+        const newLine = cursor.line + lines.length - 1;
+        doc.setCursor({ line: newLine, ch: 0 });
+        cm.focus();
       }
     });
+  });
+
+  // Handle paste to create markdown links
+  easyMDE.codemirror.on('paste', (cm, event) => {
+    const clipboardData = event.clipboardData || window.clipboardData;
+    const pastedText = clipboardData.getData('text');
+
+    // Check if pasted text is a URL
+    const urlPattern = /^https?:\/\/.+/;
+    if (urlPattern.test(pastedText)) {
+      const doc = cm.getDoc();
+      const selection = doc.getSelection();
+
+      // If there's selected text, create a markdown link
+      if (selection && selection.trim()) {
+        event.preventDefault();
+        const markdownLink = `[${selection}](${pastedText})`;
+        doc.replaceSelection(markdownLink);
+      }
+    }
   });
 
   // 3. Handle "Save Note" button

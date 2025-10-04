@@ -82,7 +82,7 @@ try {
 
       // 2. Construct file content with frontmatter
       const fileContent = `---
-title: '${title.replace(/"/g, '"')}'
+title: '${title.replace(/'/g, "''")}'
 sourceURL: '${sourceUrl}'
 draft: true
 pubDate: ${new Date().toISOString()}
