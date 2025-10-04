@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (response && !response.error) {
       pageTitle = response.title;
       pageUrl = response.url;
-      titleEl.textContent = pageTitle;
+      titleEl.value = pageTitle;
 
       // Load draft from storage
       const storageKey = `dannyis-draft-${pageUrl}`;
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.storage.local.set({ [storageKey]: easyMDE.value() });
       });
     } else {
-      titleEl.textContent = "Error loading page info.";
+      titleEl.value = "Error loading page info.";
       console.error(response.error);
     }
   });
@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
   saveBtn.addEventListener('click', () => {
     const noteContent = easyMDE.value();
     const noteData = {
-      title: pageTitle,
+      title: titleEl.value,
       sourceUrl: pageUrl,
       markdownContent: noteContent
     };
