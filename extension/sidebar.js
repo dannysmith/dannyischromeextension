@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let pageUrl = '';
   let pageTitle = '';
+  let currentStorageKey = '';
 
   // Initialize EasyMDE
   const easyMDE = new EasyMDE({
@@ -19,34 +20,68 @@ document.addEventListener('DOMContentLoaded', () => {
     placeholder: "Type your notes here...",
   });
 
-  // 1. Get Tab Info and Load Draft
-  chrome.runtime.sendMessage({ action: 'getTabInfo' }, (response) => {
-    if (response && !response.error) {
-      pageTitle = response.title;
-      pageUrl = response.url;
-      titleEl.value = pageTitle;
+  // Function to update tab info and load draft
+  function updateTabInfo() {
+    chrome.runtime.sendMessage({ action: 'getTabInfo' }, (response) => {
+      if (response && !response.error) {
+        pageTitle = response.title;
+        pageUrl = response.url;
+        titleEl.value = pageTitle;
 
-      // Load draft from storage
-      const storageKey = `dannyis-draft-${pageUrl}`;
-      chrome.storage.local.get(storageKey, (result) => {
-        if (result[storageKey]) {
-          easyMDE.value(result[storageKey]);
-        }
-      });
+        // Load draft from storage
+        currentStorageKey = `dannyis-draft-${pageUrl}`;
+        chrome.storage.local.get(currentStorageKey, (result) => {
+          if (result[currentStorageKey]) {
+            easyMDE.value(result[currentStorageKey]);
+          } else {
+            easyMDE.value('');
+          }
+        });
+      } else {
+        titleEl.value = "Error loading page info.";
+        console.error(response.error);
+      }
+    });
+  }
 
-      // Auto-save draft to storage
-      easyMDE.codemirror.on('change', () => {
-        chrome.storage.local.set({ [storageKey]: easyMDE.value() });
-      });
-    } else {
-      titleEl.value = "Error loading page info.";
-      console.error(response.error);
+  // Auto-save draft to storage on change
+  easyMDE.codemirror.on('change', () => {
+    if (currentStorageKey) {
+      chrome.storage.local.set({ [currentStorageKey]: easyMDE.value() });
     }
   });
+
+  // Listen for tab changes
+  chrome.tabs.onActivated.addListener(() => {
+    updateTabInfo();
+  });
+
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete') {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0] && tabs[0].id === tabId) {
+          updateTabInfo();
+        }
+      });
+    }
+  });
+
+  // Initial load
+  updateTabInfo();
 
   // 2. Handle "Add Highlight" button
   addHighlightBtn.addEventListener('click', () => {
     chrome.runtime.sendMessage({ action: 'getSelection' }, (response) => {
+      if (chrome.runtime.lastError) {
+        alert('Cannot get selection: ' + chrome.runtime.lastError.message);
+        return;
+      }
+
+      if (response && response.error) {
+        alert('Cannot get selection from this page. Content scripts may not run on chrome:// or extension pages.');
+        return;
+      }
+
       if (response && response.selection) {
         const cm = easyMDE.codemirror;
         const doc = cm.getDoc();
