@@ -85,7 +85,7 @@ try {
 title: '${title.replace(/'/g, "''")}'
 sourceURL: '${sourceUrl}'
 draft: true
-pubDate: ${new Date().toISOString()}
+pubDate: ${isoDate}
 ---
 
 ${markdownContent || ''}
