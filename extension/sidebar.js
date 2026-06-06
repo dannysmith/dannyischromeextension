@@ -5,10 +5,46 @@ document.addEventListener('DOMContentLoaded', () => {
   const addHighlightBtn = document.getElementById('add-highlight-btn');
   const saveBtn = document.getElementById('save-note-btn');
   const editorTextarea = document.getElementById('markdown-editor');
+  const notesDirSelect = document.getElementById('notes-dir');
+  const saveStatus = document.getElementById('save-status');
+  const saveStatusText = document.getElementById('save-status-text');
+  const copyPathBtn = document.getElementById('copy-path-btn');
 
   let pageUrl = '';
   let pageTitle = '';
   let currentStorageKey = '';
+  let lastFilePath = '';
+
+  const NOTES_DIR_KEY = 'dannyis-notes-dir';
+
+  // Show an inline status message (replaces blocking alerts)
+  function showStatus(text, { isError = false, filePath = null } = {}) {
+    saveStatusText.textContent = text;
+    saveStatus.classList.toggle('error', isError);
+    saveStatus.hidden = false;
+    lastFilePath = filePath || '';
+    copyPathBtn.hidden = !filePath;
+    copyPathBtn.textContent = 'Copy path';
+  }
+
+  // Restore the saved target directory and persist any change
+  chrome.storage.local.get(NOTES_DIR_KEY, (result) => {
+    if (result[NOTES_DIR_KEY]) {
+      notesDirSelect.value = result[NOTES_DIR_KEY];
+    }
+  });
+  notesDirSelect.addEventListener('change', () => {
+    chrome.storage.local.set({ [NOTES_DIR_KEY]: notesDirSelect.value });
+  });
+
+  // Copy the saved file's full path to the clipboard
+  copyPathBtn.addEventListener('click', () => {
+    if (!lastFilePath) return;
+    navigator.clipboard.writeText(lastFilePath).then(() => {
+      copyPathBtn.textContent = 'Copied!';
+      setTimeout(() => { copyPathBtn.textContent = 'Copy path'; }, 1500);
+    });
+  });
 
   // Initialize EasyMDE
   const easyMDE = new EasyMDE({
@@ -73,12 +109,12 @@ document.addEventListener('DOMContentLoaded', () => {
   addHighlightBtn.addEventListener('click', () => {
     chrome.runtime.sendMessage({ action: 'getSelection' }, (response) => {
       if (chrome.runtime.lastError) {
-        alert('Cannot get selection: ' + chrome.runtime.lastError.message);
+        showStatus('Cannot get selection: ' + chrome.runtime.lastError.message, { isError: true });
         return;
       }
 
       if (response && response.error) {
-        alert('Cannot get selection from this page. Content scripts may not run on chrome:// or extension pages.');
+        showStatus('Cannot get selection from this page (e.g. chrome:// or extension pages).', { isError: true });
         return;
       }
 
@@ -125,23 +161,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const noteData = {
       title: titleEl.value,
       sourceUrl: pageUrl,
-      markdownContent: noteContent
+      markdownContent: noteContent,
+      notesDir: notesDirSelect.value
     };
 
     chrome.runtime.sendMessage({ action: 'saveNote', data: noteData }, (response) => {
       if (chrome.runtime.lastError) {
-        alert('Error saving note: ' + chrome.runtime.lastError.message);
+        showStatus('Error saving note: ' + chrome.runtime.lastError.message, { isError: true });
         return;
       }
-      
+
       if (response && response.status === 'success') {
-        alert('Note saved successfully!');
-        const storageKey = `dannyis-draft-${pageUrl}`;
-        chrome.storage.local.remove(storageKey);
+        const filePath = response.response && response.response.filePath;
+        const filename = filePath ? filePath.split('/').pop() : '';
+        showStatus(`✓ Saved ${filename}`, { filePath });
+        chrome.storage.local.remove(currentStorageKey);
         easyMDE.value(''); // Clear the editor
         // The side panel remains open, ready for the next note.
       } else {
-        alert('Error saving note: ' + (response ? response.message : 'Unknown error'));
+        showStatus('Error saving note: ' + (response ? response.message : 'Unknown error'), { isError: true });
       }
     });
   });

@@ -160,3 +160,54 @@ body {
   background-color: var(--accent-blue-dark);
   border-color: var(--accent-blue-dark);
 }
+
+/* --- Notes directory selector --- */
+#dannyis-sidebar #notes-dir {
+  padding: 6px 8px;
+  border: 1px solid var(--border-medium);
+  border-radius: 6px;
+  font-size: 13px;
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+/* --- Save status --- */
+#dannyis-sidebar .save-status {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  color: var(--text-secondary);
+}
+
+#dannyis-sidebar .save-status.error {
+  color: #AF3029;
+  border-color: #AF3029;
+}
+
+@media (prefers-color-scheme: dark) {
+  #dannyis-sidebar .save-status.error {
+    color: #D14D41;
+    border-color: #D14D41;
+  }
+}
+
+#dannyis-sidebar #save-status-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#dannyis-sidebar #copy-path-btn {
+  width: auto;
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+}

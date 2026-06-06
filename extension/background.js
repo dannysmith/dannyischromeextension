@@ -24,18 +24,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // 2. Message from the sidebar asking for the highlighted text
   if (message.action === 'getSelection') {
-    // Forward the message to the content script of the active tab
+    // Read the selection on demand instead of running a content script on every page
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs.length > 0) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: 'getSelection' }, (response) => {
+      if (tabs.length === 0) {
+        sendResponse({ error: 'Could not find active tab.' });
+        return;
+      }
+      chrome.scripting.executeScript(
+        {
+          target: { tabId: tabs[0].id },
+          func: () => window.getSelection().toString()
+        },
+        (results) => {
           if (chrome.runtime.lastError) {
             console.error(chrome.runtime.lastError.message);
             sendResponse({ error: chrome.runtime.lastError.message });
           } else {
-            sendResponse(response);
+            sendResponse({ selection: results && results[0] ? results[0].result : '' });
           }
-        });
-      }
+        }
+      );
     });
     return true; // Indicates we will send a response asynchronously
   }

@@ -14,16 +14,15 @@ This extension uses a two-part architecture to overcome Chrome's security restri
 1. **Browse & Capture**: Click the extension icon to open the sidebar on any webpage
 2. **Write Notes**: Use the markdown editor to add your thoughts and commentary
 3. **Add Highlights**: Select text on the page and click "Add Highlight" to include it as a blockquote
-4. **Save**: Click "Save Note" to create a draft file in your Astro project
+4. **Save**: Click "Save Note" to create a draft file in the directory chosen in the "Save to" dropdown. A status line confirms the saved filename and offers a "Copy path" button.
 5. **Publish Later**: Review and publish notes through your normal git workflow
 
 ### Components
 
 - **Extension Files**:
   - `manifest.json`: Extension configuration with permissions
-  - `background.js`: Service worker handling messaging
-  - `content_script.js`: Text selection functionality
-  - `sidebar.html/js/css`: Main UI with EasyMDE editor
+  - `background.js`: Service worker handling messaging and reading the page selection on demand
+  - `sidebar.html/js/css`: Main UI with EasyMDE editor, target-directory dropdown, and inline save status
 - **Native Host**:
   - `native-host.js`: Node.js script that writes files
   - `com.dannyis.native_host.json`: Native messaging manifest

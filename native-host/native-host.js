@@ -11,9 +11,8 @@ const log = (message) => {
 log('--- Native host script started ---')
 
 try {
-  // Hardcoded path to the Astro project's notes directory
-  const notesDir = '/Users/danny/dev/dannyis-astro/src/content/notes'
-  log(`Notes directory: ${notesDir}`)
+  // Default notes directory; the extension can override this per-save via data.notesDir
+  const defaultNotesDir = '/Users/danny/dev/dannyis-astro/src/content/notes'
 
   // Function to slugify text for filenames (limited to 5 words)
   function slugify(text) {
@@ -70,6 +69,13 @@ try {
       log('Successfully parsed message: ' + JSON.stringify(data, null, 2))
 
       const { title, sourceUrl, markdownContent } = data
+
+      // Resolve the target directory (chosen in the extension), with a sanity check
+      const notesDir = data.notesDir || defaultNotesDir
+      if (!fs.existsSync(notesDir) || !fs.statSync(notesDir).isDirectory()) {
+        throw new Error(`Notes directory does not exist: ${notesDir}`)
+      }
+      log(`Notes directory: ${notesDir}`)
 
       // 1. Generate filename with ISO date
       const now = new Date()
