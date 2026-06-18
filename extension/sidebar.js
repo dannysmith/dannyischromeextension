@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveStatus = document.getElementById('save-status');
   const saveStatusText = document.getElementById('save-status-text');
   const copyPathBtn = document.getElementById('copy-path-btn');
+  const openEditorBtn = document.getElementById('open-editor-btn');
 
   let pageUrl = '';
   let pageTitle = '';
@@ -25,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     lastFilePath = filePath || '';
     copyPathBtn.hidden = !filePath;
     copyPathBtn.textContent = 'Copy path';
+    openEditorBtn.hidden = !filePath;
   }
 
   // Restore the saved target directory and persist any change
@@ -35,6 +37,28 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   notesDirSelect.addEventListener('change', () => {
     chrome.storage.local.set({ [NOTES_DIR_KEY]: notesDirSelect.value });
+  });
+
+  // Open the saved note in Astro Editor via its custom URL scheme.
+  // Clicking a transient anchor for an external protocol hands off to the OS
+  // handler without navigating the side panel away.
+  // Open the saved note in Astro Editor via its custom URL scheme. The side
+  // panel runs at a chrome-extension:// origin, which Chrome forbids from
+  // launching external protocols directly. Opening the scheme in a real tab
+  // lets the browser hand off to the OS handler; we then close the blank tab
+  // left behind.
+  openEditorBtn.addEventListener('click', () => {
+    if (!lastFilePath) return;
+    const url = `astro-editor://open?path=${lastFilePath}`;
+    chrome.tabs.create({ url, active: true }, (tab) => {
+      if (tab && tab.id != null) {
+        setTimeout(() => {
+          // The tab may already be gone (Chrome closes it after the protocol
+          // hand-off), so ignore the resulting "No tab with id" error.
+          chrome.tabs.remove(tab.id, () => void chrome.runtime.lastError);
+        }, 2000);
+      }
+    });
   });
 
   // Copy the saved file's full path to the clipboard
